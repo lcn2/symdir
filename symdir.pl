@@ -34,7 +34,7 @@
 #
 use strict;
 use bytes;
-use vars qw($opt_v $opt_h $opt_a $opt_n $opt_g);
+use vars qw($opt_v $opt_h $opt_a $opt_n $opt_g $opt_i);
 use Getopt::Long;
 use File::Find;
 no warnings 'File::Find';
@@ -55,11 +55,12 @@ my $destino;			# inode numner of $destdir
 
 # usage and help
 #
-my $usage = "$0 [-a] [-n] [-g perl_exp] [-h] [-v lvl] srcdir destdir";
+my $usage = "$0 [-a] [-g perl_exp] [-i] [-n] [-h] [-v lvl] srcdir destdir";
 my $help = qq{$usage
 
 	-a	     don't abort/exit after a fatal error (def: do)
 	-g perl_exp  only form paths that match the Perl regexp (def: for all)
+	-i	     ignore case when processing perl_exp (def: don't)
 	-n	     do not anything, just print cmds (def: form symlinks)
 
 	-h	     print this help message
@@ -75,8 +76,9 @@ my $help = qq{$usage
     Version: $VERSION};
 my %optctl = (
     "a" => \$opt_a,
-    "n" => \$opt_n,
     "g=s" => \$opt_g,
+    "i" => \$opt_i,
+    "n" => \$opt_n,
     "h" => \$opt_h,
     "v=i" => \$opt_v,
 );
@@ -133,8 +135,13 @@ MAIN: {
     if ($opt_v > 0) {
 	print "# DEBUG: -v $opt_v $srcdir $destdir\n";
     }
-    if ($opt_v > 2) {
-	print "# DEBUG: -g $opt_g: $srcdir\n" if defined $opt_g;
+    if ($opt_v > 1) {
+	print "# DEBUG: ";
+	print "-a " if defined $opt_a;
+	print "-g $opt_g " if defined $opt_g;
+	print "-i " if defined $opt_i;
+	print "-n " if defined $opt_n;
+	print "$srcdir $destdir\n";
 	print "# DEBUG: srcdir: $srcdir\n";
 	print "# DEBUG: destdir: $destdir\n";
     }
@@ -243,7 +250,10 @@ sub wanted($)
 
     # ignore if we have a -g pattern and the pathname does not match
     #
-    if (defined $opt_g && $pathname !~ m/$opt_g/o) {
+    if (defined $opt_g &&
+        ((defined $opt_i && $pathname !~ m/$opt_g/oi) ||
+         (!defined $opt_i && $pathname !~ m/$opt_g/o))
+       ) {
 	# ignore but do not prune files that don't match the pattern
 	print "# DEBUG: no match ignore #0 $pathname\n" if $opt_v > 3;
     	return;
