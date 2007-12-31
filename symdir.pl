@@ -1,0 +1,325 @@
+#!/usr/bin/perl -wT
+#
+# symdir - make a directory with links to files under a tree
+#
+# @(#) $Revision: 1.3 $
+# @(#) $Id: tmerge.pl,v 1.3 2005/09/13 05:23:37 chongo Exp $
+# @(#) $Source: /usr/local/src/cmd/tmerge/RCS/tmerge.pl,v $
+#
+# Copyright (c) 2007 by Landon Curt Noll.  All Rights Reserved.
+#
+# Permission to use, copy, modify, and distribute this software and
+# its documentation for any purpose and without fee is hereby granted,
+# provided that the above copyright, this permission notice and text
+# this comment, and the disclaimer below appear in all of the following:
+#
+#       supporting documentation
+#       source copies
+#       source works derived from this source
+#       binaries derived from this source or from derived source
+#
+# LANDON CURT NOLL DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+# INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO
+# EVENT SHALL LANDON CURT NOLL BE LIABLE FOR ANY SPECIAL, INDIRECT OR
+# CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF
+# USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+# OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+# PERFORMANCE OF THIS SOFTWARE.
+#
+# chongo (Landon Curt Noll, http://www.isthe.com/chongo/index.html) /\oo/\
+#
+# Share and enjoy! :-)
+
+# requirements
+#
+use strict;
+use bytes;
+use vars qw($opt_v $opt_h $opt_a $opt_n $opt_g);
+use Getopt::Long;
+use File::Find;
+no warnings 'File::Find';
+
+# version - RCS style *and* usable by MakeMaker
+#
+my $VERSION = substr q$Revision: 1.3 $, 10;
+$VERSION =~ s/\s+$//;
+
+# my vars
+#
+# NOTE: We will only cd into dirs whose name contains any type of char
+my $untaint = qr|^(.+)$|; 	# untainting path pattern
+my $srcdir;				# what is being moved
+my $destdir;			# where files are being moved to
+my $destdev;			# device of $destdir
+my $destino;			# inode numner of $destdir
+
+# usage and help
+#
+my $usage = "$0 [-a] [-n] [-g perl_exp] [-h] [-v lvl] srcdir destdir";
+my $help = qq{$usage
+
+	-a	     don't abort/exit after a fatal error (def: do)
+	-g perl_exp  only form paths that match the Perl regexp (def: for all)
+	-n	     do not anything, just print cmds (def: form symlinks)
+
+	-h	     print this help message
+	-v lvl 	     verbose / debug level
+
+	srcdir	     source directory of file tree
+	destdir	     destination directory where symlins are formed
+
+    NOTE:
+	exit 0	all is OK
+	exit >1 some fatal error
+
+    Version: $VERSION};
+my %optctl = (
+    "a" => \$opt_a,
+    "n" => \$opt_n,
+    "g=s" => \$opt_g,
+    "h" => \$opt_h,
+    "v=i" => \$opt_v,
+);
+
+
+# function prototypes
+#
+sub wanted($);
+
+
+# setup
+#
+MAIN: {
+    my %find_opt;	# File::Find directory tree walk options
+
+    # setup
+    #
+    select(STDOUT);
+    $| = 1;
+
+    # set the defaults
+    #
+    $opt_v = 0;
+
+    # parse args
+    #
+    if (!GetOptions(%optctl)) {
+	print STDERR "# $0: invalid command line\nusage:\n\t$help\n";
+	exit(2);
+    }
+    if (defined $opt_h) {
+	# just print help, no error
+	print STDERR "# $0: usage: $help\n";
+	exit(0);
+    }
+    if (! defined $ARGV[0] || ! defined $ARGV[1]) {
+	print STDERR "# $0: missing args\nusage:\n\t$help\n";
+	exit(3);
+    }
+    if (defined $ARGV[2]) {
+	print STDERR "# $0: too many args\nusage:\n\t$help\n";
+	exit(4);
+    }
+    # canonicalize srcdir removing leading ./'s, multiple //'s, trailing /'s
+    $srcdir = $ARGV[0];
+    $srcdir =~ s|^(\./+)+||;
+    $srcdir =~ s|//+|/|g;
+    $srcdir =~ s|(.)/+$|$1|;
+    # canonicalize destdir removing leading ./'s, multiple //'s, trailing /'s
+    $destdir = $ARGV[1];
+    $destdir =~ s|^(\./+)+||;
+    $destdir =~ s|//+|/|g;
+    $destdir =~ s|(.)/+$|$1|;
+    if ($opt_v > 0) {
+	print "# DEBUG: -v $opt_v $srcdir $destdir\n";
+    }
+    if ($opt_v > 2) {
+	print "# DEBUG: -g $opt_g: $srcdir\n" if defined $opt_g;
+	print "# DEBUG: srcdir: $srcdir\n";
+	print "# DEBUG: destdir: $destdir\n";
+    }
+
+    # setup to walk the srcdir
+    #
+    $find_opt{wanted} = \&wanted; # call this on each non-pruned node
+    $find_opt{bydepth} = 0;	# walk from top down, not from bottom up
+    $find_opt{follow} = 0;	# do not follow symlinks
+    $find_opt{no_chdir} = 0;	# OK to chdir as we walk the tree
+    $find_opt{untaint} = 1;	# untaint dirs we chdir to
+    $find_opt{untaint_pattern} = $untaint; # untaint pattern
+    $find_opt{untaint_skip} = 0; # do not skip any dir that is tainted
+
+    # untaint $srcdir, $destdir
+    #
+    if ($srcdir =~ /$untaint/o) {
+    	$srcdir = $1;
+    } else {
+	print STDERR "# $0: bogus chars in srcdir\n";
+	exit(5);
+    }
+    if ($destdir =~ /$untaint/o) {
+    	$destdir = $1;
+    } else {
+	print STDERR "# $0: bogus chars in destdir\n";
+	exit(6);
+    }
+
+    # record the device and inode number of $destdir
+    #
+    ($destdev, $destino,) = stat($destdir);
+    if (! defined $destdev || ! defined $destdev) {
+	print STDERR "# $0: destdir not found\n";
+	exit(7);
+    }
+
+    # walk the srcdir, making symlinks
+    #
+    find(\%find_opt, $srcdir);
+
+    # all done
+    #
+    exit(0);
+}
+
+
+# wanted - File::Find tree walking function called at each non-pruned node
+#
+# This function is a callback from the File::Find directory tree walker.
+# It will walk the $srcdir and copy/rename files as needed.
+#
+# uses these globals:
+#
+#	$srcdir		where images are from
+#	$destdir	where copied and renamed files go
+#	$untaint	untainting path pattern
+#
+####
+#
+# NOTE: The File::Find calls this function with this argument:
+#
+#	$_			current filename within $File::Find::dir
+#
+# and these global vaules set:
+#
+#	$srcdir			where images are from
+#	$destdir		where copied and renamed files go
+#	$File::Find::dir	current directory name
+#	$File::Find::name 	complete pathname to the file
+#	$File::Find::prune	set 1 one to prune current node out of path
+#	$File::Find::topdir	top directory path ($srcdir)
+#	$File::Find::topdev	device of the top directory
+#	$File::Find::topino	inode number of the top directory
+#
+sub wanted($)
+{
+    my $filename = $_;		# current filename within $File::Find::dir or
+    my $pathname;		# complete path $File::Find::name
+    my $nodedev;		# device of the current file
+    my $nodeino;		# inode number of the current file
+    my $name;			# path starting from $srcdir
+    my $destpath;		# the full path of the destination file
+
+    # canonicalize the path by removing leading ./'s, multiple //'s
+    # and trailing /'s
+    #
+    print "# DEBUG: in wanted arg: $filename\n" if $opt_v > 4;
+    print "# DEBUG: File::Find::name: $File::Find::name\n" if $opt_v > 3;
+    ($pathname = $File::Find::name) =~ s|^(\./+)+||;
+    $pathname =~ s|//+|/|g;
+    $pathname =~ s|(.)/+$|$1|;
+    print "# DEBUG: pathname: $pathname\n" if $opt_v > 2;
+
+    # untaint pathname
+    #
+    if ($pathname =~ /$untaint/o) {
+    	$pathname = $1;
+    } else {
+	print STDERR "# $0: Fatal: strange chars in pathname \n";
+	print STDERR "# $0: tainted destpath prune near exit(8): $pathname\n";
+	$File::Find::prune = 1;
+	exit(8) unless defined $opt_a;
+	return;
+    }
+
+    # ignore if we have a -g pattern and the pathname does not match
+    #
+    if (defined $opt_g && $pathname !~ m/$opt_g/o) {
+	# ignore but do not prune files that don't match the pattern
+	print "# DEBUG: no match ignore #0 $pathname\n" if $opt_v > 3;
+    	return;
+    }
+
+    # ignore non-files
+    #
+    if (! -f $pathname) {
+	# ignore but do not prune non-files
+	print "# DEBUG: non-file ignore #1 $pathname\n" if $opt_v > 3;
+    	return;
+    }
+
+    # prune if we have reached the destination directory
+    #
+    ($nodedev, $nodeino,) = stat($filename);
+    if (! defined $nodedev || ! defined $nodedev) {
+	# skip stat error
+	print STDERR "# $0: Fatal: skipping cannot stat: $filename\n";
+	print STDERR "# $0: stat err prune near exit(11): $pathname\n";
+	$File::Find::prune = 1;
+	exit(11) unless defined $opt_a;
+	return;
+    }
+    if ($destdev == $nodedev && $destino == $nodeino) {
+	# destdir prune
+	print "# DEBUG: at destdir prune #2: $pathname\n" if $opt_v > 2;
+	$File::Find::prune = 1;
+	return;
+    }
+
+    # determinme the destination name
+    #
+    $destpath = "$destdir/$filename";
+    print "# DEBUG: destpath: $destpath\n" if $opt_v > 3;
+
+    # untaint destination name
+    #
+    if ($destpath =~ /$untaint/o) {
+    	$destpath = $1;
+    } else {
+	print STDERR "# $0: Fatal: strange chars in destpath \n";
+	print STDERR "# $0: tainted destpath prune near exit(13); $destpath\n";
+	$File::Find::prune = 1;
+	exit(13) unless defined $opt_a;
+	return;
+    }
+
+    # remove if the destination exists
+    #
+    if (-e $destpath) {
+	if ($opt_n) {
+	    print "rm -f $destpath\n";
+	} elsif (unlink($destpath) <= 0 || -e $destpath) {
+	    # remove error
+	    print STDERR "# $0: Fatal: rm error: $!\n";
+	    print STDERR "# $0: err near exit(14): rm -f $destpath\n";
+	    $File::Find::prune = 1;
+	    exit(14) unless defined $opt_a;
+	} else {
+	    print "# DEBUG: rm -f $destpath\n" if $opt_v > 1;
+	}
+    }
+
+    # form symlink
+    #
+    if ($opt_n) {
+	print "ln -s $pathname $destpath\n";
+    } elsif (symlink($pathname,$destpath) <= 0 || ! -e $destpath) {
+	# remove error
+	print STDERR "# $0: Fatal: ln -s error: $!\n";
+	print STDERR "# $0: err near exit(15): ln -s $pathname $destpath\n";
+	$File::Find::prune = 1;
+	exit(15) unless defined $opt_a;
+    } else {
+	print "ln -s $pathname $destpath\n" if $opt_v > 0;
+    }
+    return;
+}
