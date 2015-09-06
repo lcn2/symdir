@@ -4,8 +4,8 @@
 # symdir - make a directory with links to files under a tree
 #
 # @(#) $Revision: 1.1 $
-# @(#) $Id: Makefile,v 1.1 2005/09/13 05:31:47 chongo Exp $
-# @(#) $Source: /usr/local/src/cmd/symdir/RCS/Makefile,v $
+# @(#) $Id: Makefile,v 1.1 2007/12/31 07:18:21 chongo Exp root $
+# @(#) $Source: /usr/local/src/bin/symdir/RCS/Makefile,v $
 #
 # Copyright (c) 2007 by Landon Curt Noll.  All Rights Reserved.
 #
@@ -34,7 +34,7 @@
 
 SHELL= /bin/sh
 
-TOPNAME= cmd
+TOPNAME= bin
 INSTALL= install
 
 DESTDIR= /usr/local/bin
