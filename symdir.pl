@@ -2,9 +2,9 @@
 #
 # symdir - make a directory with links to files under a tree
 #
-# @(#) $Revision: 1.3 $
-# @(#) $Id: tmerge.pl,v 1.3 2005/09/13 05:23:37 chongo Exp $
-# @(#) $Source: /usr/local/src/cmd/tmerge/RCS/tmerge.pl,v $
+# @(#) $Revision: 1.2 $
+# @(#) $Id: symdir.pl,v 1.2 2007/12/31 07:35:31 chongo Exp $
+# @(#) $Source: /usr/local/src/bin/symdir/RCS/symdir.pl,v $
 #
 # Copyright (c) 2007 by Landon Curt Noll.  All Rights Reserved.
 #
@@ -41,7 +41,7 @@ no warnings 'File::Find';
 
 # version - RCS style *and* usable by MakeMaker
 #
-my $VERSION = substr q$Revision: 1.3 $, 10;
+my $VERSION = substr q$Revision: 1.2 $, 10;
 $VERSION =~ s/\s+$//;
 
 # my vars
