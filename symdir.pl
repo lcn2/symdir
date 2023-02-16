@@ -1,12 +1,8 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/env perl -w
 #
 # symdir - make a directory with links to files under a tree
 #
-# @(#) $Revision: 1.2 $
-# @(#) $Id: symdir.pl,v 1.2 2007/12/31 07:35:31 chongo Exp $
-# @(#) $Source: /usr/local/src/bin/symdir/RCS/symdir.pl,v $
-#
-# Copyright (c) 2007 by Landon Curt Noll.  All Rights Reserved.
+# Copyright (c) 2007,2023 by Landon Curt Noll.  All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and
 # its documentation for any purpose and without fee is hereby granted,
