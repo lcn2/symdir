@@ -1,8 +1,8 @@
-#!/usr/bin/env perl -w
+#!/usr/bin/env perl
 #
 # symdir - make a directory with links to files under a tree
 #
-# Copyright (c) 2007,2023 by Landon Curt Noll.  All Rights Reserved.
+# Copyright (c) 2007,2015,2023,2025 by Landon Curt Noll.  All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and
 # its documentation for any purpose and without fee is hereby granted,
@@ -30,19 +30,20 @@
 #
 use strict;
 use bytes;
-use vars qw($opt_v $opt_h $opt_a $opt_n $opt_g $opt_i);
-use Getopt::Long;
+use vars qw($opt_v $opt_V $opt_h $opt_a $opt_n $opt_g $opt_i);
+use Getopt::Long qw(:config no_ignore_case);
 use File::Find;
 no warnings 'File::Find';
+use File::Basename;
 
 # version - RCS style *and* usable by MakeMaker
 #
-my $VERSION = substr q$Revision: 1.2 $, 10;
-$VERSION =~ s/\s+$//;
+my $VERSION = "1.2.1 2025-03-25";
 
 # my vars
 #
 # NOTE: We will only cd into dirs whose name contains any type of char
+my $NAME = basename($0);
 my $untaint = qr|^(.+)$|; 	# untainting path pattern
 my $srcdir;				# what is being moved
 my $destdir;			# where files are being moved to
@@ -51,16 +52,18 @@ my $destino;			# inode numner of $destdir
 
 # usage and help
 #
-my $usage = "$0 [-a] [-g perl_exp] [-i] [-n] [-h] [-v lvl] srcdir destdir";
+my $usage = "$NAME [-h] [-v lvl] [-V] [-n] [-a] [-g perl_exp] [-i] srcdir destdir";
 my $help = qq{$usage
+
+	-h	     print this help message
+	-v lvl 	     verbose / debug level
+	-V	     print version and exit
+
+	-n	     do not anything, just print cmds (def: form symlinks)
 
 	-a	     don't abort/exit after a fatal error (def: do)
 	-g perl_exp  only form paths that match the Perl regexp (def: for all)
 	-i	     ignore case when processing perl_exp (def: don't)
-	-n	     do not anything, just print cmds (def: form symlinks)
-
-	-h	     print this help message
-	-v lvl 	     verbose / debug level
 
 	srcdir	     source directory of file tree
 	destdir	     destination directory where symlins are formed
@@ -69,7 +72,7 @@ my $help = qq{$usage
 	exit 0	all is OK
 	exit >1 some fatal error
 
-    Version: $VERSION};
+$NAME version: $VERSION};
 my %optctl = (
     "a" => \$opt_a,
     "g=s" => \$opt_g,
@@ -77,6 +80,7 @@ my %optctl = (
     "n" => \$opt_n,
     "h" => \$opt_h,
     "v=i" => \$opt_v,
+    "V" => \$opt_V
 );
 
 
@@ -98,6 +102,7 @@ MAIN: {
     # set the defaults
     #
     $opt_v = 0;
+    $opt_V = 0;
 
     # parse args
     #
@@ -107,8 +112,12 @@ MAIN: {
     }
     if (defined $opt_h) {
 	# just print help, no error
-	print STDERR "# $0: usage: $help\n";
+	print STDERR "usage: $help\n";
 	exit(0);
+    }
+    if ($opt_V) {
+        print "$VERSION\n";
+        exit(0);
     }
     if (! defined $ARGV[0] || ! defined $ARGV[1]) {
 	print STDERR "# $0: missing args\nusage:\n\t$help\n";
@@ -155,13 +164,13 @@ MAIN: {
     # untaint $srcdir, $destdir
     #
     if ($srcdir =~ /$untaint/o) {
-    	$srcdir = $1;
+	$srcdir = $1;
     } else {
 	print STDERR "# $0: bogus chars in srcdir\n";
 	exit(5);
     }
     if ($destdir =~ /$untaint/o) {
-    	$destdir = $1;
+	$destdir = $1;
     } else {
 	print STDERR "# $0: bogus chars in destdir\n";
 	exit(6);
@@ -207,7 +216,7 @@ MAIN: {
 #	$srcdir			where images are from
 #	$destdir		where copied and renamed files go
 #	$File::Find::dir	current directory name
-#	$File::Find::name 	complete pathname to the file
+#	$File::Find::name	complete pathname to the file
 #	$File::Find::prune	set 1 one to prune current node out of path
 #	$File::Find::topdir	top directory path ($srcdir)
 #	$File::Find::topdev	device of the top directory
@@ -235,7 +244,7 @@ sub wanted($)
     # untaint pathname
     #
     if ($pathname =~ /$untaint/o) {
-    	$pathname = $1;
+	$pathname = $1;
     } else {
 	print STDERR "# $0: Fatal: strange chars in pathname \n";
 	print STDERR "# $0: tainted destpath prune near exit(8): $pathname\n";
@@ -252,7 +261,7 @@ sub wanted($)
        ) {
 	# ignore but do not prune files that don't match the pattern
 	print "# DEBUG: no match ignore #0 $pathname\n" if $opt_v > 3;
-    	return;
+	return;
     }
 
     # ignore non-files
