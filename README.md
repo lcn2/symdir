@@ -10,9 +10,18 @@ sudo make install
 ```
 
 
-# To use
+# Example
 
 ```sh
+$ mkdir /tmp/destdir
+$ /usr/local/bin/symdir /usr/local/src/bin/symdir /tmp/destdir
+$ ls -lRa /tmp/destdir
+```
+
+
+# To use
+
+```
 /usr/local/bin/symdir [-h] [-v lvl] [-V] [-n] [-a] [-g perl_exp] [-i] srcdir destdir
 
 	-h	     print this help message
@@ -33,15 +42,6 @@ sudo make install
 	exit >1 some fatal error
 
 symdir version: 1.2.1 2025-03-25
-```
-
-
-# Example
-
-```sh
-mkdir /tmp/destdir
-/usr/local/bin/symdir /usr/local/src/bin/symdir /tmp/destdir
-ls -lRa /tmp/destdir
 ```
 
 
