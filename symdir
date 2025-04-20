@@ -294,7 +294,7 @@ sub wanted($)
 	return;
     }
 
-    # determinme the destination name
+    # determine the destination name
     #
     $destpath = "$destdir/$filename";
     print "# DEBUG: destpath: $destpath\n" if $opt_v > 3;
